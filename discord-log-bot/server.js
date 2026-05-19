@@ -1,7 +1,7 @@
 require("dotenv").config();
 
 const express = require("express");
-const { Client, GatewayIntentBits, EmbedBuilder } = require("discord.js");
+const { ActivityType, Client, GatewayIntentBits, EmbedBuilder } = require("discord.js");
 
 const app = express();
 app.use(express.json({ limit: "256kb" }));
@@ -15,6 +15,17 @@ const channelMap = {
   Log: process.env.LOG_CHANNEL_ID,
   Hapis: process.env.HAPIS_CHANNEL_ID,
   Ehliyet: process.env.EHLIYET_CHANNEL_ID,
+};
+
+const creditText = process.env.CREDIT_TEXT || "Ws_Rozet45 Tarafindan yapilmistir";
+const activityText = process.env.BOT_ACTIVITY_TEXT || "Ws_Rozet45";
+const activityTypeName = (process.env.BOT_ACTIVITY_TYPE || "Playing").toLowerCase();
+
+const activityTypes = {
+  playing: ActivityType.Playing,
+  watching: ActivityType.Watching,
+  listening: ActivityType.Listening,
+  competing: ActivityType.Competing,
 };
 
 function isAuthorized(req) {
@@ -59,7 +70,7 @@ app.post("/roblox/log", async (req, res) => {
       .setTitle(cleanText(title, "Roblox Log"))
       .setDescription(cleanText(description, "Log bilgisi yok."))
       .setColor(Number.isInteger(color) ? color : 0xffffff)
-      .setFooter({ text: cleanText(footer, "Webhook System V3") })
+      .setFooter({ text: cleanText(`${footer || "Webhook System V3"} | ${creditText}`, creditText) })
       .setTimestamp(timestamp ? new Date(timestamp) : new Date());
 
     await discordChannel.send({ embeds: [embed] });
@@ -75,6 +86,10 @@ const port = process.env.PORT || 3000;
 
 client.once("ready", () => {
   console.log(`Discord bot logged in as ${client.user.tag}`);
+
+  client.user.setActivity(activityText, {
+    type: activityTypes[activityTypeName] || ActivityType.Playing,
+  });
 
   app.listen(port, () => {
     console.log(`HTTP server listening on port ${port}`);

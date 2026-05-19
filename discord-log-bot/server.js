@@ -17,9 +17,13 @@ const channelMap = {
   Ehliyet: process.env.EHLIYET_CHANNEL_ID,
 };
 
-const creditText = process.env.CREDIT_TEXT || "Ws_Rozet45 Tarafindan yapilmistir";
-const activityText = process.env.BOT_ACTIVITY_TEXT || "Ws_Rozet45";
+const creditText = process.env.CREDIT_TEXT || "";
+const activityText = process.env.BOT_ACTIVITY_TEXT || "Ws_Rozet45 Tarafindan yapilmistir";
 const activityTypeName = (process.env.BOT_ACTIVITY_TYPE || "Playing").toLowerCase();
+const gameUrl = process.env.ROBLOX_GAME_URL || "https://www.roblox.com/tr/games/135442651028440/MAK-Turkish-Soldier-Game";
+const gameImageUrl =
+  process.env.ROBLOX_GAME_IMAGE_URL ||
+  "https://www.roblox.com/asset-thumbnail/image?assetId=135442651028440&width=420&height=420&format=png";
 
 const activityTypes = {
   playing: ActivityType.Playing,
@@ -68,9 +72,11 @@ app.post("/roblox/log", async (req, res) => {
 
     const embed = new EmbedBuilder()
       .setTitle(cleanText(title, "Roblox Log"))
+      .setURL(gameUrl)
       .setDescription(cleanText(description, "Log bilgisi yok."))
       .setColor(Number.isInteger(color) ? color : 0xffffff)
-      .setFooter({ text: cleanText(`${footer || "Webhook System V3"} | ${creditText}`, creditText) })
+      .setThumbnail(gameImageUrl)
+      .setFooter({ text: cleanText(footer, "Webhook System V3") })
       .setTimestamp(timestamp ? new Date(timestamp) : new Date());
 
     await discordChannel.send({ embeds: [embed] });

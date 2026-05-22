@@ -1,105 +1,100 @@
 require("dotenv").config();
-
+const { Client, GatewayIntentBits, EmbedBuilder, ActivityType } = require("discord.js");
 const express = require("express");
-const { ActivityType, Client, GatewayIntentBits, EmbedBuilder } = require("discord.js");
+const axios = require("axios");
 
-const app = express();
-app.use(express.json({ limit: "256kb" }));
-
+// 1. DISCORD BOT AYARLARI
 const client = new Client({
-  intents: [GatewayIntentBits.Guilds],
+    intents: [
+        GatewayIntentBits.Guilds,
+        GatewayIntentBits.GuildMessages,
+        GatewayIntentBits.MessageContent
+    ]
 });
 
-const channelMap = {
-  System: process.env.SYSTEM_CHANNEL_ID,
-  Log: process.env.LOG_CHANNEL_ID,
-  Hapis: process.env.HAPIS_CHANNEL_ID,
-  Ehliyet: process.env.EHLIYET_CHANNEL_ID,
-};
-
-const creditText = process.env.CREDIT_TEXT || "";
-const activityText = process.env.BOT_ACTIVITY_TEXT || "Ws_Rozet45 Tarafindan yapilmistir";
-const activityTypeName = (process.env.BOT_ACTIVITY_TYPE || "Playing").toLowerCase();
+// Çevresel Değişkenler (Eğer .env yoksa sağdaki varsayılan değerleri kullanır)
 const gameUrl = process.env.ROBLOX_GAME_URL || "https://www.roblox.com/tr/games/135442651028440/MAK-Turkish-Soldier-Game";
-const gameImageUrl =
-  process.env.ROBLOX_GAME_IMAGE_URL ||
-  "https://www.roblox.com/asset-thumbnail/image?assetId=135442651028440&width=420&height=420&format=png";
+const activityText = process.env.BOT_ACTIVITY_TEXT || "Ws_Rozet45 Tarafindan yapilmistir";
+const prefix = "!"; // Komut ön eki (Örn: !aktiflik)
 
-const activityTypes = {
-  playing: ActivityType.Playing,
-  watching: ActivityType.Watching,
-  listening: ActivityType.Listening,
-  competing: ActivityType.Competing,
-};
-
-function isAuthorized(req) {
-  const authHeader = req.headers.authorization || "";
-  const token = authHeader.replace(/^Bearer\s+/i, "");
-
-  return token && token === process.env.ROBLOX_AUTH_TOKEN;
-}
-
-function cleanText(value, fallback) {
-  if (typeof value !== "string") {
-    return fallback;
-  }
-
-  return value.slice(0, 4000);
-}
+// 2. EXPRESS WEB SUNUCUSU (Render için zorunlu)
+const app = express();
+app.use(express.json());
 
 app.get("/", (req, res) => {
-  res.status(200).send("Roblox Discord log bot is running.");
+    res.send("Bot ve Web sunucusu aktif!");
 });
 
-app.post("/roblox/log", async (req, res) => {
-  if (!isAuthorized(req)) {
-    return res.status(401).json({ ok: false, error: "Unauthorized" });
-  }
+// 3. YARDIMCI FONKSİYONLAR
+// Roblox URL'sinden sayısal Place ID'yi çeker
+function getPlaceId(url) {
+    const matches = url.match(/games\/(\d+)/);
+    return matches ? matches[1] : null;
+}
 
-  const { channel, title, description, color, footer, timestamp } = req.body;
-  const channelId = channelMap[channel];
+// Roblox API'lerinden anlık aktif oyuncu sayısını çeker
+async function getRobloxActivePlayers(placeId) {
+    try {
+        // Place ID -> Universe ID dönüşümü
+        const universeRes = await axios.get(`https://apis.roblox.com/universes/v1/places/${placeId}/universe`);
+        const universeId = universeRes.data.universeId;
 
-  if (!channelId) {
-    return res.status(400).json({ ok: false, error: "Unknown channel" });
-  }
-
-  try {
-    const discordChannel = await client.channels.fetch(channelId);
-
-    if (!discordChannel || !discordChannel.isTextBased()) {
-      return res.status(400).json({ ok: false, error: "Invalid Discord channel" });
+        // Universe ID ile canlı verileri çekme
+        const gameRes = await axios.get(`https://games.roblox.com/v1/games?universeIds=${universeId}`);
+        return gameRes.data.data[0].playing || 0;
+    } catch (error) {
+        console.error("Roblox API hatası alındı:", error.message);
+        return null;
     }
+}
 
-    const embed = new EmbedBuilder()
-      .setTitle(cleanText(title, "Roblox Log"))
-      .setURL(gameUrl)
-      .setDescription(cleanText(description, "Log bilgisi yok."))
-      .setColor(Number.isInteger(color) ? color : 0xffffff)
-      .setThumbnail(gameImageUrl)
-      .setFooter({ text: cleanText(footer, "Webhook System V3") })
-      .setTimestamp(timestamp ? new Date(timestamp) : new Date());
-
-    await discordChannel.send({ embeds: [embed] });
-
-    return res.status(200).json({ ok: true });
-  } catch (error) {
-    console.error("[Log error]", error);
-    return res.status(500).json({ ok: false, error: "Send failed" });
-  }
-});
-
-const port = process.env.PORT || 3000;
-
+// 4. DISCORD EVENTLERİ
 client.once("ready", () => {
-  console.log(`Discord bot logged in as ${client.user.tag}`);
+    console.log(`[BOT] ${client.user.tag} olarak giriş yapıldı!`);
+    
+    // Bot durumunu (Activity) ayarlama
+    client.user.setActivity(activityText, { type: ActivityType.Playing });
 
-  client.user.setActivity(activityText, {
-    type: activityTypes[activityTypeName] || ActivityType.Playing,
-  });
-
-  app.listen(port, () => {
-    console.log(`HTTP server listening on port ${port}`);
-  });
+    // Render portunu dinlemeye başla
+    const port = process.env.PORT || 3000;
+    app.listen(port, () => {
+        console.log(`[SERVER] HTTP sunucusu ${port} portunda aktif.`);
+    });
 });
 
+// Mesaj Komutu Dinleyicisi
+client.on("messageCreate", async (message) => {
+    // Bot kendi mesajlarına veya diğer botlara cevap vermesin
+    if (message.author.bot) return;
+
+    // !aktiflik komutu yazıldıysa
+    if (message.content.toLowerCase() === `${prefix}aktiflik`) {
+        const placeId = getPlaceId(gameUrl);
+
+        if (!placeId) {
+            return message.reply("❌ Hata: Kod içerisindeki Roblox oyun linki geçersiz.");
+        }
+
+        // Kullanıcıya işlem yapıldığına dair bilgi verelim
+        const loadingMsg = await message.reply("🔄 Veriler getiriliyor...");
+
+        // Aktif oyuncu sayısını çek
+        const activePlayers = await getRobloxActivePlayers(placeId);
+
+        if (activePlayers === null) {
+            return loadingMsg.edit("❌ Roblox API'sinden veri alınamadı. Lütfen daha sonra tekrar deneyin.");
+        }
+
+        // Tam olarak görseldeki gibi sol şeridi yeşil olan Embed yapısı
+        const activeEmbed = new EmbedBuilder()
+            .setColor(0x00FF00) // Canlı yeşil renk (Görseldeki şerit)
+            .setDescription(`**EEM oyununun aktifliği: ${activePlayers}**`);
+
+        // Geçici yükleniyor mesajını silip embedı gönderiyoruz
+        await loadingMsg.delete().catch(() => null);
+        await message.channel.send({ embeds: [activeEmbed] });
+    }
+});
+
+// Botu başlatma tokeni
 client.login(process.env.DISCORD_TOKEN);

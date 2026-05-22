@@ -13,7 +13,7 @@ const client = new Client({
 });
 
 // Çevresel Değişkenler (Eğer .env yoksa sağdaki varsayılan değerleri kullanır)
-const gameUrl = process.env.ROBLOX_GAME_URL || "https://www.roblox.com/tr/games/135442651028440/MAK-Turkish-Soldier-Game";
+const gameUrl = process.env.ROBLOX_GAME_URL || "https://www.roblox.com/games/131952803338293/";
 const activityText = process.env.BOT_ACTIVITY_TEXT || "Ws_Rozet45 Tarafindan yapilmistir";
 const prefix = "!"; // Komut ön eki (Örn: !aktiflik)
 

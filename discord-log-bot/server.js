@@ -2,7 +2,6 @@ require("dotenv").config();
 const { Client, GatewayIntentBits, ActivityType, EmbedBuilder } = require("discord.js");
 const express = require("express");
 
-// 1. DISCORD BOT AYARLARI
 const client = new Client({
     intents: [
         GatewayIntentBits.Guilds,
@@ -13,57 +12,56 @@ const client = new Client({
 const activityText = process.env.BOT_ACTIVITY_TEXT || "Ws_Rozet45 Tarafindan yapilmistir";
 const authToken = process.env.ROBLOX_AUTH_TOKEN || "sa1234"; 
 
-// 2. EXPRESS WEB SUNUCUSU
 const app = express();
 app.use(express.json());
 
 app.get("/", (req, res) => {
-    res.send("Bot ve Web sunucusu aktif!");
+    res.send("Webhook Sistemi Aktif!");
 });
 
-// Roblox'tan gelen Kanal ID'sini yakalayıp bota gönderen endpoint
+// Roblox WebhookServer'dan gelen istekleri yakalar
 app.post("/roblox/log", async (req, res) => {
     const { token, channelId, title, description, color } = req.body;
 
-    // Güvenlik Kontrolü
+    // Token Güvenlik Doğrulaması
     if (token !== authToken) {
-        return res.status(401).send({ error: "Yetkisiz erişim: Token hatalı!" });
+        return res.status(401).send({ error: "Yetkisiz Erişim: Token Hatalı!" });
     }
 
-    // Roblox'tan gelen bir Kanal ID'si var mı kontrolü
     if (!channelId || channelId === "") {
-        return res.status(400).send({ error: "Hata: Config içerisinde bu kanal için ID tanımlanmamış!" });
+        return res.status(400).send({ error: "Hata: Kanal ID boş gönderildi!" });
     }
 
     try {
-        // Bot, gelen Kanal ID'sini Discord üzerinde arar
+        // Bot girilen kanal ID'sini sunucuda arar
         const targetChannel = await client.channels.fetch(channelId);
 
         if (targetChannel) {
             const logEmbed = new EmbedBuilder()
                 .setTitle(title || "Sistem Logu")
                 .setDescription(description || "İçerik yok")
-                .setColor(color || 0xFFFFFF) // Varsayılan Beyaz
+                .setColor(Number(color) || 0xFFFFFF)
                 .setTimestamp();
 
             await targetChannel.send({ embeds: [logEmbed] });
             return res.status(200).send({ success: true });
         } else {
-            return res.status(404).send({ error: "Discord kanalı bulunamadı." });
+            console.error(`[HATA] Kanal bulunamadı: ${channelId}`);
+            return res.status(404).send({ error: "Discord kanalı bulunamadı. Bot kanalı göremiyor olabilir." });
         }
     } catch (err) {
-        console.error("Kanal ID'sine log gönderilirken hata oluştu:", err.message);
-        return res.status(500).send({ error: "Log iletilemedi, Kanal ID'si hatalı veya bot o kanalı göremiyor." });
+        console.error("[HATA] Mesaj gönderme başarısız:", err.message);
+        return res.status(500).send({ error: "Log gönderilemedi." });
     }
 });
 
 client.once("ready", () => {
-    console.log(`[BOT] ${client.user.tag} olarak giriş yapıldı!`);
+    console.log(`[BOT] ${client.user.tag} olarak başarıyla giriş yapıldı!`);
     client.user.setActivity(activityText, { type: ActivityType.Playing });
 
     const port = process.env.PORT || 3000;
     app.listen(port, () => {
-        console.log(`[SERVER] HTTP sunucusu ${port} portunda aktif.`);
+        console.log(`[SERVER] HTTP dinleyici portu aktif: ${port}`);
     });
 });
 
